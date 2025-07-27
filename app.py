@@ -2,91 +2,121 @@ import streamlit as st
 from google import genai
 from google.genai import types
 
-# Page setup
-st.title("📘 SmartPrep AI – WAEC/UTME Tutor")
-st.write("Welcome to your AI-powered exam preparation tutor!")
+# ─── CONFIG ─────────────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="📘 SmartPrep AI Tutor",
+    layout="centered",
+)
 
-# Load Gemini API key securely
+# Load your secure API key
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-def generate_question(subject):
-    # Prompt with structure enforced by system_instruction
-    prompt = f"Create one multiple choice {subject} question."
+# ─── GENERATION HELPERS ──────────────────────────────────────────────────────────
+def call_gemini(payload):
     resp = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=(
-                "Provide output in this exact format:\n"
-                "Question: ...\n"
-                "A) ...\n"
-                "B) ...\n"
-                "C) ...\n"
-                "D) ...\n"
-                "Answer: <single letter>\n"
-                "Explanation: <detailed explanation>"
-            )
-        )
+        contents=payload["contents"],
+        generation_config=payload.get("generationConfig", {})
     )
-    text = resp.text or ""
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    return resp
 
-    # Parse structured content
-    question = next((l.split(":",1)[1].strip() for l in lines if l.startswith("Question:")), "")
-    options = [l for l in lines if l[:2] in ("A)", "B)", "C)", "D)")]
-    if len(options) < 4:
-        options += ["(Option missing)"] * (4 - len(options))
-    answer_letter = next((l.split(":",1)[1].strip() for l in lines if l.startswith("Answer:")), "")
-    answer = next((opt for opt in options if opt.startswith(answer_letter)), answer_letter)
+def generate_question(subject, difficulty):
+    prompt = (
+        f"Create one multiple-choice WAEC/UTME question for '{subject}' "
+        f"at '{difficulty}' difficulty. Label options A), B), C), D), then:"
+        "\nAnswer: [e.g., C]\nExplanation: [detail]"
+    )
+    payload = {"contents":[{"role":"user","parts":[{"text":prompt}]}]}
+    data = call_gemini(payload)
+    text = data.candidates[0].content.parts[0].text.strip().split("\n")
+    # parse into question/options/answer/expl …
+    # (same parsing logic you already have)
+    return parsed_question
 
-    explanation_lines = [l.split(":",1)[1].strip() for l in lines if l.startswith("Explanation:")]
-    explanation_index = lines.index(next((l for l in lines if l.startswith("Explanation:")), lines[-1]))
-    explanation = " ".join(lines[explanation_index:]) if explanation_lines else "No explanation provided."
+def generate_followup(prompt):
+    payload = {"contents":[{"role":"user","parts":[{"text":prompt}]}]}
+    data = call_gemini(payload)
+    return data.candidates[0].content.parts[0].text.strip()
 
-    return {
-        "subject": subject,
-        "question": question or "No question generated.",
-        "options": options,
-        "answer": answer,
-        "explanation": explanation
+# ─── SESSION STATE SETUP ─────────────────────────────────────────────────────────
+if "quiz" not in st.session_state:
+    st.session_state.quiz = {
+        "subject": None,
+        "difficulty": None,
+        "questions": [],
+        "index": 0,
+        "score": 0,
+        "feedback": None,
+        "hints": []
     }
 
-# Subject selector
-subject = st.selectbox("Choose a subject:", ["Mathematics", "Biology", "English"])
-if st.session_state.get("quiz_subject") != subject:
-    st.session_state.quiz_subject = subject
-    st.session_state.quiz_data = [generate_question(subject)]
-    st.session_state.index = 0
-    st.session_state.score = 0
-    st.session_state.feedback = None
+quiz = st.session_state.quiz
 
-# Quiz interface
-if st.session_state.index < len(st.session_state.quiz_data):
-    q = st.session_state.quiz_data[st.session_state.index]
-    st.subheader(f"{q['subject']} Question {st.session_state.index + 1}:")
-    st.write(q["question"])  # ✅ Displays the question
-    choice = st.radio("Pick an answer:", q["options"])
+# ─── HEADER ─────────────────────────────────────────────────────────────────────
+st.title("📘 SmartPrep AI – WAEC/UTME Tutor")
+st.markdown("> Your AI‑powered guide for exam success")
 
-    if st.button("Submit"):
-        if choice == q["answer"]:
-            st.success("Correct! ✅")
-            st.session_state.score += 1
-        else:
-            st.error(f"Wrong! Correct: {q['answer']}")
-        st.session_state.feedback = q["explanation"]
-
-    if st.session_state.feedback:
-        st.write("💡 Explanation:", st.session_state.feedback)
-        if st.button("Next Question"):
-            st.session_state.quiz_data.append(generate_question(subject))
-            st.session_state.index += 1
-            st.session_state.feedback = None
-            st.rerun()
+# ─── SETUP SCREEN ────────────────────────────────────────────────────────────────
+if quiz["subject"] is None:
+    with st.form("setup"):
+        subject = st.selectbox("Subject", ["Mathematics","Biology","English","Physics","Chemistry","Government"])
+        difficulty = st.selectbox("Difficulty", ["Easy","Medium","Hard"])
+        start = st.form_submit_button("Start Quiz")
+    if start:
+        quiz.update({
+            "subject": subject,
+            "difficulty": difficulty,
+            "questions": [generate_question(subject, difficulty) for _ in range(3)],  # preload 3
+            "index": 0,
+            "score": 0,
+            "feedback": None,
+            "hints": []
+        })
+        st.experimental_rerun()
 else:
-    st.success(f"🎉 Quiz Complete! Score: {st.session_state.score}/{len(st.session_state.quiz_data)}")
-    if st.button("Restart"):
-        st.session_state.quiz_data = [generate_question(subject)]
-        st.session_state.index = 0
-        st.session_state.score = 0
-        st.session_state.feedback = None
-        st.rerun()
+    # ─── QUIZ FLOW ────────────────────────────────────────────────────────────────
+    q = quiz["questions"][quiz["index"]]
+    
+    st.progress((quiz["index"]) / 10)  # assuming 10‑question quiz
+    st.subheader(f"{quiz['subject']} Question {quiz['index']+1}")
+    st.write(q["question"])
+    
+    choice = st.radio("Pick an answer", q["options"], key=f"opt{quiz['index']}")
+    
+    col1, col2, col3 = st.columns([1,2,1])
+    with col1:
+        if st.button("Ask for Hint"):
+            hint = generate_followup(f"Give a one-sentence hint (no answer) for: {q['question']}")
+            quiz["hints"].append(hint)
+    with col2:
+        if st.button("Submit"):
+            correct = (choice == q["answer"])
+            if correct:
+                st.success("✅ Correct!")
+                quiz["score"] += 1
+            else:
+                st.error(f"❌ Wrong. Correct: {q['answer']}")
+            quiz["feedback"] = q["explanation"]
+    with col3:
+        if quiz["feedback"] and st.button("Next"):
+            # preload another if needed
+            if len(quiz["questions"]) - quiz["index"] < 3:
+                quiz["questions"].append(generate_question(quiz["subject"], quiz["difficulty"]))
+            quiz["index"] += 1
+            quiz["feedback"] = None
+            st.experimental_rerun()
+    
+    # show hint(s) & feedback
+    if quiz["hints"]:
+        st.info("💡 Hint: " + quiz["hints"][-1])
+    if quiz["feedback"]:
+        st.markdown(f"**Explanation:** {quiz['feedback']}")
+
+    # ─── COMPLETION SCREEN ────────────────────────────────────────────────────────
+    if quiz["index"] >= 10:
+        st.balloons()
+        st.success(f"🎉 You scored {quiz['score']}/10!")
+        if st.button("Restart Quiz"):
+            for k in quiz:
+                quiz[k] = None if k in ("subject","difficulty") else []
+            st.experimental_rerun()
