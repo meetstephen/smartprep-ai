@@ -2,479 +2,330 @@ import streamlit as st
 from google import genai
 from google.genai import types
 import json
-import asyncio
 import time
+import asyncio
 
-# ─── CONFIG ─────────────────────────────────────────────────────────────────────
+# ─── PAGE CONFIGURATION ─────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="📘 SmartPrep AI Tutor",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    layout="centered"
 )
 
-# Custom CSS for modern UI styling
+# ─── SIMPLIFIED STYLING ─────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-    
     .main-header {
         text-align: center;
         margin-bottom: 2rem;
     }
-    
-    .main-title {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #4f46e5;
-        margin-bottom: 0.5rem;
-    }
-    
-    .main-subtitle {
-        color: #6b7280;
-        font-size: 1.1rem;
-    }
-    
-    .setup-container {
-        background: white;
-        padding: 2rem;
-        border-radius: 1rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        margin-bottom: 2rem;
-    }
-    
     .quiz-container {
-        background: white;
+        background: #f8f9fa;
         padding: 2rem;
         border-radius: 1rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        margin-bottom: 1rem;
-    }
-    
-    .question-counter {
-        color: #4f46e5;
-        font-weight: 600;
-        font-size: 0.9rem;
-        margin-bottom: 0.5rem;
-    }
-    
-    .question-text {
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin-bottom: 1.5rem;
-        line-height: 1.6;
-    }
-    
-    .feedback-container {
-        background: #f8fafc;
-        padding: 1.5rem;
-        border-radius: 0.75rem;
-        border-left: 4px solid #4f46e5;
-        margin-top: 1rem;
-    }
-    
-    .feedback-title {
-        font-weight: 700;
-        font-size: 1.1rem;
-        margin-bottom: 0.75rem;
-        color: #1f2937;
-    }
-    
-    .explanation-text {
-        color: #4b5563;
-        line-height: 1.6;
-    }
-    
-    .results-container {
-        background: white;
-        padding: 3rem 2rem;
-        border-radius: 1rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        text-align: center;
-    }
-    
-    .final-score {
-        font-size: 3rem;
-        font-weight: 700;
-        color: #4f46e5;
         margin: 1rem 0;
     }
-    
-    .progress-container {
-        margin-bottom: 1.5rem;
-    }
-    
-    .stButton > button {
-        width: 100%;
-        background: #4f46e5;
-        color: white;
-        font-weight: 600;
-        border: none;
-        padding: 0.75rem 1rem;
-        border-radius: 0.5rem;
-        transition: all 0.2s;
-    }
-    
-    .stButton > button:hover {
-        background: #4338ca;
-        transform: translateY(-1px);
-    }
-    
-    .stRadio > div {
-        gap: 0.75rem;
-    }
-    
-    .stRadio > div > label {
-        background: white;
-        border: 2px solid #d1d5db;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        cursor: pointer;
-        transition: all 0.2s;
-        width: 100%;
-        margin-bottom: 0.5rem;
-    }
-    
-    .stRadio > div > label:hover {
-        border-color: #4f46e5;
-        background: #f8fafc;
-    }
-    
-    .stSelectbox > div > div {
-        border-radius: 0.5rem;
-        border: 2px solid #d1d5db;
-    }
-    
-    .loading-spinner {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 2rem;
-    }
-    
-    .loading-dots {
-        display: flex;
-        gap: 0.25rem;
-    }
-    
-    .loading-dot {
-        width: 0.75rem;
-        height: 0.75rem;
-        background: #4f46e5;
-        border-radius: 50%;
-        animation: bounce 1.4s ease-in-out infinite both;
-    }
-    
-    .loading-dot:nth-child(1) { animation-delay: -0.32s; }
-    .loading-dot:nth-child(2) { animation-delay: -0.16s; }
-    
-    @keyframes bounce {
-        0%, 80%, 100% { transform: scale(0); }
-        40% { transform: scale(1); }
-    }
-    
-    .success-message {
-        background: #f0fdf4;
-        border: 2px solid #22c55e;
-        color: #15803d;
+    .success-msg {
+        background: #d4edda;
+        color: #155724;
         padding: 1rem;
         border-radius: 0.5rem;
-        font-weight: 600;
-        text-align: center;
         margin: 1rem 0;
+        text-align: center;
     }
-    
-    .error-message {
-        background: #fef2f2;
-        border: 2px solid #ef4444;
-        color: #dc2626;
+    .error-msg {
+        background: #f8d7da;
+        color: #721c24;
         padding: 1rem;
         border-radius: 0.5rem;
-        font-weight: 600;
-        text-align: center;
         margin: 1rem 0;
+        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Load your secure API key
-try:
-    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-except:
-    st.error("Please configure your GEMINI_API_KEY in Streamlit secrets.")
-    st.stop()
-
-# ─── GENERATION HELPERS ──────────────────────────────────────────────────────────
-def call_gemini_structured(subject, difficulty):
-    """Generate a structured question using Gemini API with JSON schema"""
-    prompt = f"""Create one multiple-choice WAEC/UTME question for the subject "{subject}" at a "{difficulty}" difficulty level. 
-    The question should be unique and academically rigorous. Ensure the options are plausible and the explanation is clear and educational."""
-    
-    # Define the JSON schema for structured output
-    schema = {
-        "type": "object",
-        "properties": {
-            "question": {"type": "string"},
-            "options": {
-                "type": "array",
-                "items": {"type": "string"},
-                "minItems": 4,
-                "maxItems": 4
-            },
-            "answer": {"type": "string"},
-            "explanation": {"type": "string"}
-        },
-        "required": ["question", "options", "answer", "explanation"]
-    }
-    
+# ─── API CLIENT SETUP WITH ERROR HANDLING ───────────────────────────────────────
+@st.cache_resource
+def initialize_client():
+    """Initialize the Gemini client with proper error handling"""
     try:
+        from google import genai
+        api_key = st.secrets.get("GEMINI_API_KEY", "")
+        if not api_key:
+            st.error("❌ GEMINI_API_KEY not found in secrets. Please add it in your Streamlit app settings.")
+            st.stop()
+        
+        client = genai.Client(api_key=api_key)
+        # Test the connection with a simple call
+        test_response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[{"role": "user", "parts": [{"text": "Say 'API working'"}]}]
+        )
+        return client
+    except ImportError:
+        st.error("❌ Google GenAI library not installed. Please add 'google-genai' to requirements.txt")
+        st.stop()
+    except Exception as e:
+        st.error(f"❌ API Connection Failed: {str(e)}")
+        st.error("Please check your API key and internet connection.")
+        st.stop()
+
+# ─── SIMPLIFIED QUESTION GENERATION ─────────────────────────────────────────────
+def generate_simple_question(client, subject, difficulty):
+    """Generate a single question with basic error handling"""
+    try:
+        prompt = f"""
+        Create a {difficulty.lower()} level multiple choice question for {subject}.
+        
+        Format your response EXACTLY like this example:
+        Question: What is 2 + 2?
+        A) 3
+        B) 4
+        C) 5
+        D) 6
+        Answer: B
+        Explanation: 2 + 2 equals 4, which is option B.
+        """
+        
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=[{"role": "user", "parts": [{"text": prompt}]}],
-            generation_config={
-                "response_mime_type": "application/json",
-                "response_schema": schema
-            }
+            contents=[{"role": "user", "parts": [{"text": prompt}]}]
         )
         
-        result = json.loads(response.candidates[0].content.parts[0].text)
-        
-        # Validate that the answer is one of the options
-        if result["answer"] not in result["options"]:
-            result["answer"] = result["options"][0]  # Fallback to first option
-            
-        return result
+        content = response.candidates[0].content.parts[0].text.strip()
+        return parse_question_response(content)
         
     except Exception as e:
-        st.error(f"Error generating question: {str(e)}")
+        st.error(f"Question generation failed: {str(e)}")
         return None
 
-def preload_questions(subject, difficulty, count=3):
-    """Preload multiple questions for smooth user experience"""
-    questions = []
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    for i in range(count):
-        status_text.text(f"Generating question {i+1} of {count}...")
-        progress_bar.progress((i) / count)
+def parse_question_response(content):
+    """Parse the AI response into structured question data"""
+    try:
+        lines = [line.strip() for line in content.split('\n') if line.strip()]
         
-        question = call_gemini_structured(subject, difficulty)
-        if question:
-            questions.append(question)
+        question = ""
+        options = []
+        answer = ""
+        explanation = ""
+        
+        for line in lines:
+            if line.startswith("Question:"):
+                question = line.replace("Question:", "").strip()
+            elif line.startswith(("A)", "B)", "C)", "D)")):
+                options.append(line)
+            elif line.startswith("Answer:"):
+                answer = line.replace("Answer:", "").strip()
+            elif line.startswith("Explanation:"):
+                explanation = line.replace("Explanation:", "").strip()
+        
+        if not all([question, len(options) >= 4, answer, explanation]):
+            raise ValueError("Incomplete question data")
             
-    progress_bar.progress(1.0)
-    status_text.text("Questions ready!")
-    time.sleep(0.5)  # Brief pause to show completion
-    progress_bar.empty()
-    status_text.empty()
+        return {
+            "question": question,
+            "options": options,
+            "answer": answer,
+            "explanation": explanation
+        }
+    except Exception:
+        return None
+
+# ─── SESSION STATE INITIALIZATION ───────────────────────────────────────────────
+def initialize_session_state():
+    """Initialize session state with default values"""
+    if "app_stage" not in st.session_state:
+        st.session_state.app_stage = "setup"
+    if "subject" not in st.session_state:
+        st.session_state.subject = "Mathematics"
+    if "difficulty" not in st.session_state:
+        st.session_state.difficulty = "Medium"
+    if "current_question" not in st.session_state:
+        st.session_state.current_question = None
+    if "score" not in st.session_state:
+        st.session_state.score = 0
+    if "question_count" not in st.session_state:
+        st.session_state.question_count = 0
+    if "show_answer" not in st.session_state:
+        st.session_state.show_answer = False
+    if "user_choice" not in st.session_state:
+        st.session_state.user_choice = None
+
+# ─── MAIN APPLICATION ───────────────────────────────────────────────────────────
+def main():
+    # Initialize session state
+    initialize_session_state()
     
-    return questions
+    # Initialize API client
+    client = initialize_client()
+    
+    # Header
+    st.markdown("""
+    <div class="main-header">
+        <h1 style="color: #4f46e5; font-size: 2.5rem;">📘 SmartPrep AI Tutor</h1>
+        <p style="color: #6b7280;">Your AI-powered guide for WAEC/UTME success</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Main application flow
+    if st.session_state.app_stage == "setup":
+        show_setup_screen(client)
+    elif st.session_state.app_stage == "quiz":
+        show_quiz_screen(client)
+    elif st.session_state.app_stage == "results":
+        show_results_screen()
 
-# ─── SESSION STATE SETUP ─────────────────────────────────────────────────────────
-if "quiz_state" not in st.session_state:
-    st.session_state.quiz_state = {
-        "stage": "setup",  # setup, quiz, results
-        "subject": None,
-        "difficulty": None,
-        "questions": [],
-        "current_index": 0,
-        "score": 0,
-        "user_answers": [],
-        "show_feedback": False,
-        "quiz_length": 10
-    }
-
-quiz = st.session_state.quiz_state
-
-# ─── HEADER ─────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="main-header">
-    <h1 class="main-title">📘 SmartPrep AI Tutor</h1>
-    <p class="main-subtitle">Your AI-powered guide for WAEC/UTME success</p>
-</div>
-""", unsafe_allow_html=True)
-
-# ─── SETUP SCREEN ────────────────────────────────────────────────────────────────
-if quiz["stage"] == "setup":
-    st.markdown('<div class="setup-container">', unsafe_allow_html=True)
-    st.markdown("### Let's Get Started!")
+def show_setup_screen(client):
+    """Display the setup screen for subject and difficulty selection"""
+    st.markdown('<div class="quiz-container">', unsafe_allow_html=True)
+    st.subheader("Let's Get Started!")
     
     col1, col2 = st.columns(2)
     
     with col1:
         subject = st.selectbox(
-            "Subject",
+            "Select Subject:",
             ["Mathematics", "Biology", "English Language", "Physics", "Chemistry", "Government"],
-            key="subject_select"
+            index=0
         )
     
     with col2:
         difficulty = st.selectbox(
-            "Difficulty Level",
+            "Select Difficulty:",
             ["Easy", "Medium", "Hard"],
-            index=1,  # Default to Medium
-            key="difficulty_select"
+            index=1
         )
     
-    if st.button("Start Quiz", key="start_quiz"):
-        quiz["subject"] = subject
-        quiz["difficulty"] = difficulty
-        quiz["stage"] = "loading"
-        st.rerun()
+    if st.button("🚀 Start Quiz", type="primary", use_container_width=True):
+        with st.spinner("Generating your first question..."):
+            # Update session state
+            st.session_state.subject = subject
+            st.session_state.difficulty = difficulty
+            
+            # Generate first question
+            question = generate_simple_question(client, subject, difficulty)
+            
+            if question:
+                st.session_state.current_question = question
+                st.session_state.app_stage = "quiz"
+                st.session_state.question_count = 1
+                st.success("✅ Question generated successfully!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("❌ Failed to generate question. Please try again.")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── LOADING SCREEN ───────────────────────────────────────────────────────────────
-elif quiz["stage"] == "loading":
-    st.markdown("""
-    <div class="loading-spinner">
-        <div class="loading-dots">
-            <div class="loading-dot"></div>
-            <div class="loading-dot"></div>
-            <div class="loading-dot"></div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown(f"<p style='text-align: center; margin-top: 1rem;'>Preparing {quiz['subject']} questions...</p>", unsafe_allow_html=True)
-    
-    # Generate initial batch of questions
-    questions = preload_questions(quiz["subject"], quiz["difficulty"], 5)
-    
-    if questions:
-        quiz["questions"] = questions
-        quiz["stage"] = "quiz"
+def show_quiz_screen(client):
+    """Display the quiz screen with current question"""
+    if not st.session_state.current_question:
+        st.error("No question available. Returning to setup...")
+        st.session_state.app_stage = "setup"
         st.rerun()
-    else:
-        st.error("Failed to generate questions. Please try again.")
-        quiz["stage"] = "setup"
-        st.rerun()
-
-# ─── QUIZ SCREEN ──────────────────────────────────────────────────────────────────
-elif quiz["stage"] == "quiz":
-    # Progress bar
-    progress = (quiz["current_index"]) / quiz["quiz_length"]
-    st.progress(progress)
+        return
     
-    # Current question
-    current_q = quiz["questions"][quiz["current_index"]]
+    question = st.session_state.current_question
+    
+    # Progress indicator
+    st.progress(st.session_state.question_count / 10)
     
     st.markdown('<div class="quiz-container">', unsafe_allow_html=True)
     
-    # Question counter and text
-    st.markdown(f'<p class="question-counter">Question {quiz["current_index"] + 1} of {quiz["quiz_length"]}</p>', unsafe_allow_html=True)
-    st.markdown(f'<div class="question-text">{current_q["question"]}</div>', unsafe_allow_html=True)
+    # Question header
+    st.markdown(f"**Question {st.session_state.question_count} of 10** - {st.session_state.subject}")
+    st.markdown("---")
     
-    # Answer options
-    if not quiz["show_feedback"]:
-        user_choice = st.radio(
+    # Question text
+    st.markdown(f"### {question['question']}")
+    
+    # Answer options (only show if answer not revealed)
+    if not st.session_state.show_answer:
+        choice = st.radio(
             "Select your answer:",
-            current_q["options"],
-            key=f"question_{quiz['current_index']}",
-            label_visibility="collapsed"
+            question['options'],
+            key=f"q_{st.session_state.question_count}"
         )
         
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("Submit Answer", key="submit_answer"):
-                quiz["user_answers"].append(user_choice)
-                quiz["show_feedback"] = True
+            if st.button("Submit Answer", type="primary", use_container_width=True):
+                st.session_state.user_choice = choice
+                st.session_state.show_answer = True
                 
-                # Check if answer is correct
-                if user_choice == current_q["answer"]:
-                    quiz["score"] += 1
+                # Check if correct
+                if choice.startswith(question['answer']):
+                    st.session_state.score += 1
                 
                 st.rerun()
     
-    # Feedback section
-    if quiz["show_feedback"]:
-        user_answer = quiz["user_answers"][quiz["current_index"]]
-        correct_answer = current_q["answer"]
-        is_correct = user_answer == correct_answer
+    # Show feedback if answer submitted
+    if st.session_state.show_answer:
+        user_answer = st.session_state.user_choice
+        correct_answer = question['answer']
         
         # Show result
-        if is_correct:
-            st.markdown('<div class="success-message">✅ Correct! Well done.</div>', unsafe_allow_html=True)
+        if user_answer.startswith(correct_answer):
+            st.markdown('<div class="success-msg">✅ Correct! Well done.</div>', unsafe_allow_html=True)
         else:
-            st.markdown(f'<div class="error-message">❌ Incorrect. The correct answer was: {correct_answer}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="error-msg">❌ Incorrect. The correct answer was {correct_answer}.</div>', unsafe_allow_html=True)
         
         # Show explanation
-        st.markdown(f"""
-        <div class="feedback-container">
-            <div class="feedback-title">💡 Explanation</div>
-            <div class="explanation-text">{current_q["explanation"]}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("**💡 Explanation:**")
+        st.info(question['explanation'])
         
-        # Next question button
+        # Next question or finish
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if quiz["current_index"] + 1 >= quiz["quiz_length"]:
-                if st.button("View Results", key="view_results"):
-                    quiz["stage"] = "results"
+            if st.session_state.question_count >= 10:
+                if st.button("View Results", type="primary", use_container_width=True):
+                    st.session_state.app_stage = "results"
                     st.rerun()
             else:
-                if st.button("Next Question", key="next_question"):
-                    quiz["current_index"] += 1
-                    quiz["show_feedback"] = False
-                    
-                    # Generate more questions if needed
-                    if len(quiz["questions"]) - quiz["current_index"] < 3:
-                        with st.spinner("Loading more questions..."):
-                            new_questions = preload_questions(quiz["subject"], quiz["difficulty"], 3)
-                            quiz["questions"].extend(new_questions)
-                    
-                    st.rerun()
+                if st.button("Next Question", type="primary", use_container_width=True):
+                    with st.spinner("Generating next question..."):
+                        next_question = generate_simple_question(client, st.session_state.subject, st.session_state.difficulty)
+                        
+                        if next_question:
+                            st.session_state.current_question = next_question
+                            st.session_state.question_count += 1
+                            st.session_state.show_answer = False
+                            st.session_state.user_choice = None
+                            st.rerun()
+                        else:
+                            st.error("Failed to generate next question. Please try again.")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── RESULTS SCREEN ───────────────────────────────────────────────────────────────
-elif quiz["stage"] == "results":
+def show_results_screen():
+    """Display the final results screen"""
     st.balloons()
     
-    st.markdown('<div class="results-container">', unsafe_allow_html=True)
+    st.markdown('<div class="quiz-container">', unsafe_allow_html=True)
     
     st.markdown("## 🎉 Quiz Complete!")
-    st.markdown("Here's how you performed:")
+    st.markdown("---")
     
-    score_percentage = (quiz["score"] / quiz["quiz_length"]) * 100
-    st.markdown(f'<div class="final-score">{quiz["score"]} / {quiz["quiz_length"]}</div>', unsafe_allow_html=True)
-    st.markdown(f"**{score_percentage:.1f}% Score**")
+    # Score display
+    score_percentage = (st.session_state.score / 10) * 100
+    st.markdown(f"### Your Score: {st.session_state.score} / 10 ({score_percentage:.0f}%)")
     
     # Performance feedback
     if score_percentage >= 80:
-        st.markdown("🌟 **Excellent work!** You have a strong grasp of the material.")
+        st.success("🌟 Excellent work! You have mastered this topic.")
     elif score_percentage >= 60:
-        st.markdown("👍 **Good job!** Keep practicing to improve further.")
+        st.info("👍 Good job! Keep practicing to improve further.")
     else:
-        st.markdown("📚 **Keep studying!** Review the explanations and try again.")
+        st.warning("📚 Keep studying! Review the explanations and try again.")
     
-    if st.button("Take Another Quiz", key="restart_quiz"):
-        # Reset quiz state
-        st.session_state.quiz_state = {
-            "stage": "setup",
-            "subject": None,
-            "difficulty": None,
-            "questions": [],
-            "current_index": 0,
-            "score": 0,
-            "user_answers": [],
-            "show_feedback": False,
-            "quiz_length": 10
-        }
+    # Restart option
+    if st.button("Take Another Quiz", type="primary", use_container_width=True):
+        # Reset all session state
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
         st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── FOOTER ─────────────────────────────────────────────────────────────────────
-st.markdown("---")
-st.markdown(
-    "<div style='text-align: center; color: #6b7280; font-size: 0.9rem;'>"
-    "Powered by Google Gemini AI • Built for Nigerian Students"
-    "</div>", 
-    unsafe_allow_html=True
-)
+# ─── RUN APPLICATION ────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    main()
