@@ -443,66 +443,15 @@ class AchievementSystem:
             
             with col:
                 st.markdown(f"""
-                <div class="mastery-bar">
-                    <div class="mastery-progress" style="width: {mastery_percent}%"></div>
+                <div class="{card_class}">
+                    <div class="achievement-icon">{achievement['icon']}</div>
+                    <div class="achievement-content">
+                        <strong>{achievement['title']}</strong><br>
+                        <small>{achievement['description']}</small><br>
+                        <span class="points-highlight">+{achievement['xp']} XP</span>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
-                st.write(f"Average Score: {progress['average_score']:.1f}% | Quizzes Taken: {progress['total_quizzes']}")
-        
-        # Recent quiz history
-        if user_data['quiz_history']:
-            st.subheader("📋 Recent Quiz History")
-            recent_quizzes = sorted(user_data['quiz_history'], key=lambda x: x['timestamp'], reverse=True)[:5]
-            
-            for quiz in recent_quizzes:
-                with st.expander(f"{quiz['subject']} - {quiz['topic']} ({quiz['score']:.1f}%)"):
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.write(f"**Score:** {quiz['correct']}/{quiz['total']} ({quiz['score']:.1f}%)")
-                    with col2:
-                        st.write(f"**Time:** {quiz['duration']//60}:{quiz['duration']%60:02d}")
-                    with col3:
-                        st.write(f"**XP Earned:** {quiz['xp_earned']}")
-    
-    @staticmethod
-    def display_subject_analytics(subject):
-        """Display detailed analytics for a specific subject"""
-        user_data = st.session_state.user_data
-        subject_quizzes = [q for q in user_data['quiz_history'] if q['subject'] == subject]
-        
-        if not subject_quizzes:
-            st.info(f"No quiz data available for {subject} yet. Take a quiz to see your progress!")
-            return
-        
-        st.subheader(f"📊 {subject} Analytics")
-        
-        # Performance over time
-        scores = [q['score'] for q in subject_quizzes]
-        avg_score = sum(scores) / len(scores)
-        best_score = max(scores)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Average Score", f"{avg_score:.1f}%")
-        with col2:
-            st.metric("Best Score", f"{best_score:.1f}%")
-        with col3:
-            st.metric("Quizzes Taken", len(subject_quizzes))
-        
-        # Topic breakdown
-        topic_performance = {}
-        for quiz in subject_quizzes:
-            topic = quiz['topic']
-            if topic not in topic_performance:
-                topic_performance[topic] = []
-            topic_performance[topic].append(quiz['score'])
-        
-        if topic_performance:
-            st.subheader("📈 Topic Performance")
-            for topic, scores in topic_performance.items():
-                avg_score = sum(scores) / len(scores)
-                st.write(f"**{topic}:** {avg_score:.1f}% average ({len(scores)} quiz{'s' if len(scores) > 1 else ''})")
-                st.progress(avg_score / 100)
 
 # ─── DAILY CHALLENGES SYSTEM ──────────────────────────────────────────────────────
 class DailyChallenges:
@@ -695,251 +644,6 @@ def get_jamb_subjects_and_topics():
             "Separation of Powers", "Pressure Groups"
         ]
     }
-
-# ─── MAIN APPLICATION PAGES ───────────────────────────────────────────────────────
-def show_home_page():
-    """Display the main home page with navigation options"""
-    # Display main header
-    st.markdown('<div class="main-header">', unsafe_allow_html=True)
-    st.title("📘 SmartPrep AI Tutor - JAMB Edition")
-    st.markdown("Your intelligent companion for JAMB preparation")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Display motivational quote
-    quote = random.choice(MOTIVATIONAL_QUOTES)
-    st.markdown(f'<div class="motivational-quote">💡 {quote}</div>', unsafe_allow_html=True)
-    
-    # User profile section
-    if not st.session_state.user_data['username']:
-        UserManager.create_user_profile()
-        return
-    
-    # Welcome message with user stats
-    user_data = st.session_state.user_data
-    st.markdown(f"""
-    <div class="stats-card">
-        <h2>Welcome back, {user_data['username']}! 👋</h2>
-        <p>Level {user_data['level']} • {user_data['total_xp']} XP • {user_data['streak']} day streak</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Daily Challenge
-    DailyChallenges.display_daily_challenge()
-    
-    # Feature cards
-    st.subheader("🚀 What would you like to do?")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">📝</div>
-            <h3>Take a Quiz</h3>
-            <p>Practice with AI-generated questions tailored to JAMB syllabus</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Start Quiz", key="start_quiz"):
-            st.session_state.current_page = 'subject_selection'
-            st.rerun()
-    
-    with col2:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">📈</div>
-            <h3>View Progress</h3>
-            <p>Track your performance and see detailed analytics</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("View Progress", key="view_progress"):
-            st.session_state.current_page = 'progress'
-            st.rerun()
-    
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">🏆</div>
-            <h3>Achievements</h3>
-            <p>Check your unlocked achievements and earn rewards</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("View Achievements", key="view_achievements"):
-            st.session_state.current_page = 'achievements'
-            st.rerun()
-    
-    with col4:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">💡</div>
-            <h3>Study Tips</h3>
-            <p>Get personalized study recommendations and tips</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Study Tips", key="study_tips"):
-            st.session_state.current_page = 'study_tips'
-            st.rerun()
-
-def show_subject_selection():
-    """Display subject and topic selection interface"""
-    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
-    
-    st.title("📚 Choose Your Subject")
-    st.write("Select a subject and topic for your quiz")
-    
-    subjects_topics = get_jamb_subjects_and_topics()
-    
-    # Subject selection
-    st.subheader("Select Subject")
-    selected_subject = st.selectbox("Choose a subject:", list(subjects_topics.keys()))
-    
-    if selected_subject:
-        # Display subject grid for visual selection
-        st.markdown('<div class="subject-grid">', unsafe_allow_html=True)
-        for subject in subjects_topics.keys():
-            selected_class = "selected" if subject == selected_subject else ""
-            st.markdown(f"""
-            <div class="subject-card {selected_class}">
-                <h4>{subject}</h4>
-            </div>
-            """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Topic selection
-        st.subheader(f"Select Topic from {selected_subject}")
-        topics = subjects_topics[selected_subject]
-        selected_topic = st.selectbox("Choose a topic:", topics)
-        
-        # Difficulty selection
-        st.subheader("Select Difficulty")
-        difficulty = st.selectbox("Choose difficulty level:", ["easy", "medium", "hard"])
-        
-        # Number of questions
-        num_questions = st.slider("Number of questions:", min_value=3, max_value=10, value=5)
-        
-        # Display study tips for selected subject
-        StudyTipsSystem.display_study_tips(selected_subject)
-        
-        # Start quiz button
-        if st.button("🚀 Generate Quiz", type="primary"):
-            st.session_state.selected_subject = selected_subject
-            st.session_state.selected_topic = selected_topic
-            st.session_state.selected_difficulty = difficulty
-            st.session_state.num_questions = num_questions
-            st.session_state.current_page = 'quiz'
-            st.rerun()
-
-def show_quiz_page(client):
-    """Display the quiz interface"""
-    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
-    
-    subject = st.session_state.get('selected_subject', 'Mathematics')
-    topic = st.session_state.get('selected_topic', 'Algebra')
-    difficulty = st.session_state.get('selected_difficulty', 'medium')
-    num_questions = st.session_state.get('num_questions', 5)
-    
-    # Generate questions if not already done
-    if 'current_quiz_questions' not in st.session_state:
-        with st.spinner("🤖 Generating quiz questions..."):
-            questions = QuizGenerator.generate_questions(client, subject, topic, difficulty, num_questions)
-            st.session_state.current_quiz_questions = questions
-    
-    questions = st.session_state.current_quiz_questions
-    
-    if questions:
-        QuizGenerator.display_quiz(questions, subject, topic)
-        
-        # Check if this was a daily challenge
-        if st.session_state.get('is_daily_challenge', False) and st.session_state.quiz_state.get('submitted', False):
-            DailyChallenges.complete_daily_challenge()
-            st.session_state.is_daily_challenge = False
-    else:
-        st.error("Failed to generate quiz questions. Please try again.")
-        if st.button("Back to Subject Selection"):
-            st.session_state.current_page = 'subject_selection'
-            st.rerun()
-
-def show_progress_page():
-    """Display the progress tracking page"""
-    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
-    
-    ProgressTracker.display_dashboard()
-    
-    # Subject-specific analytics
-    user_data = st.session_state.user_data
-    if user_data['subjects_progress']:
-        st.subheader("📊 Subject Analytics")
-        selected_subject = st.selectbox("Select subject for detailed analytics:", 
-                                       list(user_data['subjects_progress'].keys()))
-        if selected_subject:
-            ProgressTracker.display_subject_analytics(selected_subject)
-
-def show_achievements_page():
-    """Display the achievements page"""
-    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
-    
-    AchievementSystem.display_achievements()
-
-def show_study_tips_page():
-    """Display the study tips page"""
-    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
-    
-    st.title("💡 Study Tips & Strategies")
-    
-    subjects_topics = get_jamb_subjects_and_topics()
-    
-    # Random tip of the day
-    tip_of_day = StudyTipsSystem.get_random_tip()
-    st.markdown(f"""
-    <div class="daily-challenge">
-        <h3>💡 Tip of the Day</h3>
-        <p>{tip_of_day}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Subject-specific tips
-    selected_subject = st.selectbox("Select subject for specific tips:", list(subjects_topics.keys()))
-    if selected_subject:
-        StudyTipsSystem.display_study_tips(selected_subject)
-
-# ─── MAIN APPLICATION CONTROLLER ──────────────────────────────────────────────────
-def main():
-    """Main application controller"""
-    # Initialize systems
-    UserManager.initialize_user_data()
-    UserManager.update_streak()
-    client = initialize_client()
-    
-    # Initialize session state
-    if 'current_page' not in st.session_state:
-        st.session_state.current_page = 'home'
-    
-    # Route to appropriate page
-    if st.session_state.current_page == 'home':
-        show_home_page()
-    elif st.session_state.current_page == 'subject_selection':
-        show_subject_selection()
-    elif st.session_state.current_page == 'quiz':
-        show_quiz_page(client)
-    elif st.session_state.current_page == 'progress':
-        show_progress_page()
-    elif st.session_state.current_page == 'achievements':
-        show_achievements_page()
-    elif st.session_state.current_page == 'study_tips':
-        show_study_tips_page()
-
-# ─── APPLICATION ENTRY POINT ──────────────────────────────────────────────────────
-if __name__ == "__main__":
-    main() class="{card_class}">
-                    <div class="achievement-icon">{achievement['icon']}</div>
-                    <div class="achievement-content">
-                        <strong>{achievement['title']}</strong><br>
-                        <small>{achievement['description']}</small><br>
-                        <span class="points-highlight">+{achievement['xp']} XP</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
 
 # ─── QUIZ GENERATION SYSTEM ───────────────────────────────────────────────────────
 class QuizGenerator:
@@ -1225,5 +929,300 @@ class ProgressTracker:
                 mastery_percent = min(100, progress['average_score'])
                 st.write(f"**{subject}**")
                 st.markdown(f"""
-                <div
-   
+                <div class="mastery-bar">
+                    <div class="mastery-progress" style="width: {mastery_percent}%"></div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.write(f"Average Score: {progress['average_score']:.1f}% | Quizzes Taken: {progress['total_quizzes']}")
+        
+        # Recent quiz history
+        if user_data['quiz_history']:
+            st.subheader("📋 Recent Quiz History")
+            recent_quizzes = sorted(user_data['quiz_history'], key=lambda x: x['timestamp'], reverse=True)[:5]
+            
+            for quiz in recent_quizzes:
+                with st.expander(f"{quiz['subject']} - {quiz['topic']} ({quiz['score']:.1f}%)"):
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.write(f"**Score:** {quiz['correct']}/{quiz['total']} ({quiz['score']:.1f}%)")
+                    with col2:
+                        st.write(f"**Time:** {quiz['duration']//60}:{quiz['duration']%60:02d}")
+                    with col3:
+                        st.write(f"**XP Earned:** {quiz['xp_earned']}")
+    
+    @staticmethod
+    def display_subject_analytics(subject):
+        """Display detailed analytics for a specific subject"""
+        user_data = st.session_state.user_data
+        subject_quizzes = [q for q in user_data['quiz_history'] if q['subject'] == subject]
+        
+        if not subject_quizzes:
+            st.info(f"No quiz data available for {subject} yet. Take a quiz to see your progress!")
+            return
+        
+        st.subheader(f"📊 {subject} Analytics")
+        
+        # Performance over time
+        scores = [q['score'] for q in subject_quizzes]
+        avg_score = sum(scores) / len(scores)
+        best_score = max(scores)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Average Score", f"{avg_score:.1f}%")
+        with col2:
+            st.metric("Best Score", f"{best_score:.1f}%")
+        with col3:
+            st.metric("Quizzes Taken", len(subject_quizzes))
+        
+        # Topic breakdown
+        topic_performance = {}
+        for quiz in subject_quizzes:
+            topic = quiz['topic']
+            if topic not in topic_performance:
+                topic_performance[topic] = []
+            topic_performance[topic].append(quiz['score'])
+        
+        if topic_performance:
+            st.subheader("📈 Topic Performance")
+            for topic, scores in topic_performance.items():
+                avg_score = sum(scores) / len(scores)
+                st.write(f"**{topic}:** {avg_score:.1f}% average ({len(scores)} quiz{'s' if len(scores) > 1 else ''})")
+                st.progress(avg_score / 100)
+
+# ─── MAIN APPLICATION PAGES ───────────────────────────────────────────────────────
+def show_home_page():
+    """Display the main home page with navigation options"""
+    # Display main header
+    st.markdown('<div class="main-header">', unsafe_allow_html=True)
+    st.title("📘 SmartPrep AI Tutor - JAMB Edition")
+    st.markdown("Your intelligent companion for JAMB preparation")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Display motivational quote
+    quote = random.choice(MOTIVATIONAL_QUOTES)
+    st.markdown(f'<div class="motivational-quote">💡 {quote}</div>', unsafe_allow_html=True)
+    
+    # User profile section
+    if not st.session_state.user_data['username']:
+        UserManager.create_user_profile()
+        return
+    
+    # Welcome message with user stats
+    user_data = st.session_state.user_data
+    st.markdown(f"""
+    <div class="stats-card">
+        <h2>Welcome back, {user_data['username']}! 👋</h2>
+        <p>Level {user_data['level']} • {user_data['total_xp']} XP • {user_data['streak']} day streak</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Daily Challenge
+    DailyChallenges.display_daily_challenge()
+    
+    # Feature cards
+    st.subheader("🚀 What would you like to do?")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">📝</div>
+            <h3>Take a Quiz</h3>
+            <p>Practice with AI-generated questions tailored to JAMB syllabus</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Start Quiz", key="start_quiz"):
+            st.session_state.current_page = 'subject_selection'
+            st.rerun()
+    
+    with col2:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">📈</div>
+            <h3>View Progress</h3>
+            <p>Track your performance and see detailed analytics</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("View Progress", key="view_progress"):
+            st.session_state.current_page = 'progress'
+            st.rerun()
+    
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">🏆</div>
+            <h3>Achievements</h3>
+            <p>Check your unlocked achievements and earn rewards</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("View Achievements", key="view_achievements"):
+            st.session_state.current_page = 'achievements'
+            st.rerun()
+    
+    with col4:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">💡</div>
+            <h3>Study Tips</h3>
+            <p>Get personalized study recommendations and tips</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Study Tips", key="study_tips"):
+            st.session_state.current_page = 'study_tips'
+            st.rerun()
+
+def show_subject_selection():
+    """Display subject and topic selection interface"""
+    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
+    
+    st.title("📚 Choose Your Subject")
+    st.write("Select a subject and topic for your quiz")
+    
+    subjects_topics = get_jamb_subjects_and_topics()
+    
+    # Subject selection
+    st.subheader("Select Subject")
+    selected_subject = st.selectbox("Choose a subject:", list(subjects_topics.keys()))
+    
+    if selected_subject:
+        # Display subject grid for visual selection
+        st.markdown('<div class="subject-grid">', unsafe_allow_html=True)
+        for subject in subjects_topics.keys():
+            selected_class = "selected" if subject == selected_subject else ""
+            st.markdown(f"""
+            <div class="subject-card {selected_class}">
+                <h4>{subject}</h4>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Topic selection
+        st.subheader(f"Select Topic from {selected_subject}")
+        topics = subjects_topics[selected_subject]
+        selected_topic = st.selectbox("Choose a topic:", topics)
+        
+        # Difficulty selection
+        st.subheader("Select Difficulty")
+        difficulty = st.selectbox("Choose difficulty level:", ["easy", "medium", "hard"])
+        
+        # Number of questions
+        num_questions = st.slider("Number of questions:", min_value=3, max_value=10, value=5)
+        
+        # Display study tips for selected subject
+        StudyTipsSystem.display_study_tips(selected_subject)
+        
+        # Start quiz button
+        if st.button("🚀 Generate Quiz", type="primary"):
+            st.session_state.selected_subject = selected_subject
+            st.session_state.selected_topic = selected_topic
+            st.session_state.selected_difficulty = difficulty
+            st.session_state.num_questions = num_questions
+            st.session_state.current_page = 'quiz'
+            st.rerun()
+
+def show_quiz_page(client):
+    """Display the quiz interface"""
+    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
+    
+    subject = st.session_state.get('selected_subject', 'Mathematics')
+    topic = st.session_state.get('selected_topic', 'Algebra')
+    difficulty = st.session_state.get('selected_difficulty', 'medium')
+    num_questions = st.session_state.get('num_questions', 5)
+    
+    # Generate questions if not already done
+    if 'current_quiz_questions' not in st.session_state:
+        with st.spinner("🤖 Generating quiz questions..."):
+            questions = QuizGenerator.generate_questions(client, subject, topic, difficulty, num_questions)
+            st.session_state.current_quiz_questions = questions
+    
+    questions = st.session_state.current_quiz_questions
+    
+    if questions:
+        QuizGenerator.display_quiz(questions, subject, topic)
+        
+        # Check if this was a daily challenge
+        if st.session_state.get('is_daily_challenge', False) and st.session_state.quiz_state.get('submitted', False):
+            DailyChallenges.complete_daily_challenge()
+            st.session_state.is_daily_challenge = False
+    else:
+        st.error("Failed to generate quiz questions. Please try again.")
+        if st.button("Back to Subject Selection"):
+            st.session_state.current_page = 'subject_selection'
+            st.rerun()
+
+def show_progress_page():
+    """Display the progress tracking page"""
+    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
+    
+    ProgressTracker.display_dashboard()
+    
+    # Subject-specific analytics
+    user_data = st.session_state.user_data
+    if user_data['subjects_progress']:
+        st.subheader("📊 Subject Analytics")
+        selected_subject = st.selectbox("Select subject for detailed analytics:", 
+                                       list(user_data['subjects_progress'].keys()))
+        if selected_subject:
+            ProgressTracker.display_subject_analytics(selected_subject)
+
+def show_achievements_page():
+    """Display the achievements page"""
+    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
+    
+    AchievementSystem.display_achievements()
+
+def show_study_tips_page():
+    """Display the study tips page"""
+    st.markdown('<a href="#" class="home-button" onclick="window.location.reload()">🏠 Home</a>', unsafe_allow_html=True)
+    
+    st.title("💡 Study Tips & Strategies")
+    
+    subjects_topics = get_jamb_subjects_and_topics()
+    
+    # Random tip of the day
+    tip_of_day = StudyTipsSystem.get_random_tip()
+    st.markdown(f"""
+    <div class="daily-challenge">
+        <h3>💡 Tip of the Day</h3>
+        <p>{tip_of_day}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Subject-specific tips
+    selected_subject = st.selectbox("Select subject for specific tips:", list(subjects_topics.keys()))
+    if selected_subject:
+        StudyTipsSystem.display_study_tips(selected_subject)
+
+# ─── MAIN APPLICATION CONTROLLER ──────────────────────────────────────────────────
+def main():
+    """Main application controller"""
+    # Initialize systems
+    UserManager.initialize_user_data()
+    UserManager.update_streak()
+    client = initialize_client()
+    
+    # Initialize session state
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 'home'
+    
+    # Route to appropriate page
+    if st.session_state.current_page == 'home':
+        show_home_page()
+    elif st.session_state.current_page == 'subject_selection':
+        show_subject_selection()
+    elif st.session_state.current_page == 'quiz':
+        show_quiz_page(client)
+    elif st.session_state.current_page == 'progress':
+        show_progress_page()
+    elif st.session_state.current_page == 'achievements':
+        show_achievements_page()
+    elif st.session_state.current_page == 'study_tips':
+        show_study_tips_page()
+
+# ─── APPLICATION ENTRY POINT ──────────────────────────────────────────────────────
+if __name__ == "__main__":
+    main()
