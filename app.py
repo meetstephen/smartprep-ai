@@ -7,8 +7,6 @@ import json
 import hashlib
 import base64
 from io import BytesIO
-import plotly.graph_objects as go
-import plotly.express as px
 
 # ─── PAGE CONFIGURATION ─────────────────────────────────────────────────────────
 st.set_page_config(
