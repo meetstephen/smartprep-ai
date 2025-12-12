@@ -1,5 +1,5 @@
 import streamlit as st
-from google import genai
+import google.generativeai as genai
 import time
 import random
 from datetime import datetime, timedelta
@@ -260,20 +260,16 @@ st.markdown("""
 def initialize_client():
     """Initialize the Gemini client with proper error handling"""
     try:
-        from google import genai
         api_key = st.secrets.get("GEMINI_API_KEY", "")
         if not api_key:
             st.error("❌ GEMINI_API_KEY not found in secrets. Please add it in your Streamlit app settings.")
             st.stop()
-        client = genai.Client(api_key=api_key)
+        client = genai.GenerativeModel(model_name="gemini-1.5-flash")  # Adjust model name as needed
         # Test the connection with a simple call
-        test_response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=[{"role": "user", "parts": [{"text": "Say 'API working'"}]}]
-        )
+        test_response = client.generate_content("Say 'API working'")
         return client
     except ImportError:
-        st.error("❌ Google GenAI library not installed. Please add 'google-genai' to requirements.txt")
+        st.error("❌ Google GenAI library not installed. Please add 'google-generativeai' to requirements.txt")
         st.stop()
     except Exception as e:
         st.error(f"❌ API Connection Failed: {str(e)}")
@@ -397,11 +393,8 @@ def generate_jamb_question(client, subject, difficulty, previous_questions=None)
         Topic: Basic Arithmetic
         """
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=[{"role": "user", "parts": [{"text": prompt}]}]
-        )
-        content = response.candidates[0].content.parts[0].text.strip()
+        response = client.generate_content(prompt)
+        content = response.text.strip()
         question_data = parse_question_response(content)
         
         if question_data:
@@ -488,13 +481,13 @@ def calculate_xp(score, time_efficiency, difficulty_level):
         difficulty_multiplier = 1.25
     elif difficulty_level == "Hard":
         difficulty_multiplier = 1.5
-        
+    
     total_xp = int((base_xp + score_xp + time_bonus) * difficulty_multiplier)
     return total_xp
 
 def calculate_level(total_xp):
     """Calculate user level based on total XP"""
-    level = 1 + int(total_xp / 500)  # Level up every 500 XP
+    level = 1 + int(total_xp / 500) # Level up every 500 XP
     return level
 
 def get_xp_progress(total_xp):
@@ -512,8 +505,8 @@ def update_streak(last_active_date=None):
     today = datetime.now().date()
     
     if not last_active_date:
-        return 1, today  # First day of streak
-        
+        return 1, today # First day of streak
+    
     # Convert string date to datetime if needed
     if isinstance(last_active_date, str):
         last_active_date = datetime.strptime(last_active_date, "%Y-%m-%d").date()
@@ -540,7 +533,7 @@ def get_subject_mastery(subject_history):
         
         if topic not in mastery_data:
             mastery_data[topic] = {"attempts": 0, "correct": 0}
-            
+        
         mastery_data[topic]["attempts"] += 1
         if correct:
             mastery_data[topic]["correct"] += 1
@@ -756,7 +749,7 @@ def initialize_session_state():
     if "timer_start" not in st.session_state:
         st.session_state.timer_start = None
     if "time_per_question" not in st.session_state:
-        st.session_state.time_per_question = 120  # Default: 2 minutes per question
+        st.session_state.time_per_question = 120 # Default: 2 minutes per question
     if "total_time_used" not in st.session_state:
         st.session_state.total_time_used = 0
     if "timer_expired" not in st.session_state:
@@ -884,24 +877,24 @@ def show_setup_screen(client):
     if st.session_state.total_quizzes > 0:
         show_user_stats()
         show_subject_progress()
-        
-        # Show achievements
-        user_data = {
-            "total_quizzes": st.session_state.total_quizzes,
-            "perfect_scores": st.session_state.perfect_scores,
-            "streak_count": st.session_state.streak_count,
-            "subject_history": st.session_state.subject_history
-        }
-        
-        achievements = check_achievements(user_data)
-        unlocked_achievements = [a for a in achievements if a["unlocked"]]
-        
-        if unlocked_achievements:
-            st.markdown("### 🏆 Your Achievements")
-            cols = st.columns(min(3, len(unlocked_achievements)))
-            for i, achievement in enumerate(unlocked_achievements[:3]):  # Show first 3
-                with cols[i]:
-                    st.markdown(f'<div class="achievement-card"><div class="achievement-icon">{achievement["icon"]}</div><div class="achievement-content"><strong>{achievement["title"]}</strong><br>{achievement["description"]}</div></div>', unsafe_allow_html=True)
+    
+    # Show achievements
+    user_data = {
+        "total_quizzes": st.session_state.total_quizzes,
+        "perfect_scores": st.session_state.perfect_scores,
+        "streak_count": st.session_state.streak_count,
+        "subject_history": st.session_state.subject_history
+    }
+    
+    achievements = check_achievements(user_data)
+    unlocked_achievements = [a for a in achievements if a["unlocked"]]
+    
+    if unlocked_achievements:
+        st.markdown("### 🏆 Your Achievements")
+        cols = st.columns(min(3, len(unlocked_achievements)))
+        for i, achievement in enumerate(unlocked_achievements[:3]): # Show first 3
+            with cols[i]:
+                st.markdown(f'<div class="achievement-card"><div class="achievement-icon">{achievement["icon"]}</div><div class="achievement-content"><strong>{achievement["title"]}</strong><br>{achievement["description"]}</div></div>', unsafe_allow_html=True)
     
     st.markdown('<div class="quiz-container">', unsafe_allow_html=True)
     st.subheader("🚀 Start a New Quiz!")
@@ -935,7 +928,7 @@ def show_setup_screen(client):
             index=0,
             format_func=lambda x: f"{x}"
         )
-        
+    
         # Show subject description
         st.markdown(f'<div class="info-box">{subjects_info[subject]}</div>', unsafe_allow_html=True)
     
@@ -946,7 +939,7 @@ def show_setup_screen(client):
             index=1,
             help="Easy: Basic concepts | Medium: Standard JAMB level | Hard: Advanced concepts"
         )
-        
+    
         # Show difficulty info
         difficulty_info = {
             "Easy": "✅ Perfect for beginners and concept review",
@@ -1231,7 +1224,7 @@ def show_results_screen():
     
     # Subject mastery for this quiz
     if st.session_state.subject in st.session_state.subject_history:
-        recent_history = st.session_state.subject_history[st.session_state.subject][-10:]  # Last 10 questions
+        recent_history = st.session_state.subject_history[st.session_state.subject][-10:] # Last 10 questions
         mastery_data = get_subject_mastery(recent_history)
         if mastery_data:
             st.markdown(f"### 📈 {st.session_state.subject} - Topic Performance")
