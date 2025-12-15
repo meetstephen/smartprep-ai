@@ -1,8 +1,8 @@
 import streamlit as st
-from google import genai
+import google.generativeai as genai
 import time
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import hashlib
 import base64
@@ -264,12 +264,13 @@ def initialize_client():
         if not api_key:
             st.error("❌ GEMINI_API_KEY not found in secrets. Please add it in your Streamlit app settings.")
             st.stop()
-        client = genai.GenerativeModel(model_name="gemini-1.5-flash")  # Adjust model name as needed
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
         # Test the connection with a simple call
-        test_response = client.generate_content("Say 'API working'")
-        return client
+        test_response = model.generate_content("Say 'API working'")
+        return model
     except ImportError:
-        st.error("❌ Google GenAI library not installed. Please add 'google-generativeai' to requirements.txt")
+        st.error("❌ Google Generative AI library not installed. Please add 'google-generativeai' to requirements.txt")
         st.stop()
     except Exception as e:
         st.error(f"❌ API Connection Failed: {str(e)}")
@@ -356,7 +357,7 @@ def get_jamb_subjects_and_topics():
     }
 
 # ─── IMPROVED QUESTION GENERATION FOR JAMB CURRICULUM ───────────────────────────
-def generate_jamb_question(client, subject, difficulty, previous_questions=None):
+def generate_jamb_question(model, subject, difficulty, previous_questions=None):
     """Generate a JAMB-style question with topic diversity"""
     try:
         # Get JAMB topics for the selected subject
@@ -393,7 +394,7 @@ def generate_jamb_question(client, subject, difficulty, previous_questions=None)
         Topic: Basic Arithmetic
         """
 
-        response = client.generate_content(prompt)
+        response = model.generate_content(prompt)
         content = response.text.strip()
         question_data = parse_question_response(content)
         
@@ -405,7 +406,7 @@ def generate_jamb_question(client, subject, difficulty, previous_questions=None)
                 for prev_q in previous_questions:
                     if similarity_check(question_data["question"], prev_q["question"]):
                         # If too similar, generate a new question recursively
-                        return generate_jamb_question(client, subject, difficulty, previous_questions)
+                        return generate_jamb_question(model, subject, difficulty, previous_questions)
             
             return question_data
         return None
@@ -842,7 +843,7 @@ def main():
     initialize_session_state()
     
     # Initialize API client
-    client = initialize_client()
+    model = initialize_client()
     
     # Show navigation bar (except on setup screen)
     if st.session_state.app_stage != "setup":
@@ -865,13 +866,13 @@ def main():
     
     # Main application flow
     if st.session_state.app_stage == "setup":
-        show_setup_screen(client)
+        show_setup_screen(model)
     elif st.session_state.app_stage == "quiz":
-        show_quiz_screen(client)
+        show_quiz_screen(model)
     elif st.session_state.app_stage == "results":
         show_results_screen()
 
-def show_setup_screen(client):
+def show_setup_screen(model):
     """Display the enhanced setup screen with user stats and subject selection"""
     # Show user stats if they have progress
     if st.session_state.total_quizzes > 0:
@@ -972,7 +973,7 @@ def show_setup_screen(client):
             st.session_state.time_per_question = time_options[time_choice]
             
             # Generate first question
-            question = generate_jamb_question(client, subject, difficulty)
+            question = generate_jamb_question(model, subject, difficulty)
             
             if question:
                 st.session_state.current_question = question
@@ -988,7 +989,7 @@ def show_setup_screen(client):
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-def show_quiz_screen(client):
+def show_quiz_screen(model):
     """Display the enhanced quiz screen with current question"""
     if not st.session_state.current_question:
         st.error("No question available. Returning to setup...")
@@ -1098,7 +1099,7 @@ def show_quiz_screen(client):
                 if st.button("➡️ Next Question", type="primary", use_container_width=True):
                     with st.spinner("🔄 Generating next question..."):
                         next_question = generate_jamb_question(
-                            client, 
+                            model, 
                             st.session_state.subject, 
                             st.session_state.difficulty,
                             st.session_state.previous_questions
