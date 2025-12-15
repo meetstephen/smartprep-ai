@@ -1,8 +1,8 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 import time
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 import hashlib
 import base64
